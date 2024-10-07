@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import clientPromise from '../../lib/mongodb'
-import { ObjectId } from 'mongodb'
+import { ObjectId, MongoClient } from 'mongodb'
 
 interface Choice {
   index: number;
@@ -19,13 +19,36 @@ interface Usage {
   total_time: number;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+interface SensorData {
+  _id: ObjectId;
+  messages: Array<{
+    role: string;
+    content: Array<{ type: string; text?: string; image_url?: { url: string } }>;
+  }>;
+  model: string;
+  respuesta: {
+    id: string;
+    object: string;
+    created: number;
+    model: string;
+    choices: Choice[];
+    usage: Usage;
+    system_fingerprint: string;
+    x_groq: { id: string };
+  };
+  fecha: Date;
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method === 'GET') {
     try {
-      const client = await clientPromise
+      const client: MongoClient = await clientPromise
       const db = client.db("compost")
       
-      const data = await db.collection("datos").findOne({}, { sort: { fecha: -1 } })
+      const data = await db.collection<SensorData>("datos").findOne({}, { sort: { fecha: -1 } })
       
       if (!data) {
         return res.status(404).json({ error: 'No data found' })
@@ -34,25 +57,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Transform the data to remove $ from field names
       const transformedData = {
         ...data,
-        _id: (data._id as ObjectId).toString(),
-        fecha: data.fecha instanceof Date ? data.fecha.getTime() : data.fecha,
+        _id: data._id.toString(),
+        fecha: data.fecha.getTime(),
         respuesta: {
           ...data.respuesta,
-          created: typeof data.respuesta.created === 'object' && '$numberInt' in data.respuesta.created
-            ? parseInt(data.respuesta.created.$numberInt)
-            : data.respuesta.created,
-          choices: (data.respuesta.choices as Choice[]).map((choice: Choice) => ({
+          choices: data.respuesta.choices.map((choice: Choice) => ({
             ...choice,
-            index: typeof choice.index === 'object' && '$numberInt' in choice.index
-              ? parseInt(choice.index.$numberInt)
-              : choice.index
+            index: choice.index
           })),
-          usage: Object.entries(data.respuesta.usage as Usage).reduce((acc, [key, value]) => {
-            acc[key] = typeof value === 'object' && ('$numberDouble' in value || '$numberInt' in value)
-              ? parseFloat(value.$numberDouble || value.$numberInt)
-              : value
+          usage: Object.entries(data.respuesta.usage).reduce((acc: Partial<Usage>, [key, value]) => {
+            acc[key as keyof Usage] = value
             return acc
-          }, {} as Usage)
+          }, {})
         }
       }
       
