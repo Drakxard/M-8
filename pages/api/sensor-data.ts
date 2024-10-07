@@ -1,5 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import clientPromise from '../../lib/mongodb'
+import { ObjectId } from 'mongodb'
+
+interface Choice {
+  index: number;
+  message: { role: string; content: string };
+  logprobs: null;
+  finish_reason: string;
+}
+
+interface Usage {
+  queue_time: number;
+  prompt_tokens: number;
+  prompt_time: number;
+  completion_tokens: number;
+  completion_time: number;
+  total_tokens: number;
+  total_time: number;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -16,18 +34,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Transform the data to remove $ from field names
       const transformedData = {
         ...data,
+        _id: (data._id as ObjectId).toString(),
         fecha: data.fecha instanceof Date ? data.fecha.getTime() : data.fecha,
         respuesta: {
           ...data.respuesta,
-          created: data.respuesta.created.$numberInt || data.respuesta.created,
-          choices: data.respuesta.choices.map((choice: any) => ({
+          created: typeof data.respuesta.created === 'object' && '$numberInt' in data.respuesta.created
+            ? parseInt(data.respuesta.created.$numberInt)
+            : data.respuesta.created,
+          choices: (data.respuesta.choices as Choice[]).map((choice: Choice) => ({
             ...choice,
-            index: choice.index.$numberInt || choice.index
+            index: typeof choice.index === 'object' && '$numberInt' in choice.index
+              ? parseInt(choice.index.$numberInt)
+              : choice.index
           })),
-          usage: Object.entries(data.respuesta.usage).reduce((acc: any, [key, value]: [string, any]) => {
-            acc[key] = value.$numberDouble || value.$numberInt || value
+          usage: Object.entries(data.respuesta.usage as Usage).reduce((acc, [key, value]) => {
+            acc[key] = typeof value === 'object' && ('$numberDouble' in value || '$numberInt' in value)
+              ? parseFloat(value.$numberDouble || value.$numberInt)
+              : value
             return acc
-          }, {})
+          }, {} as Usage)
         }
       }
       

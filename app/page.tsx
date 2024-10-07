@@ -11,6 +11,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  ChartOptions,
 } from 'chart.js'
 
 ChartJS.register(
@@ -93,12 +94,12 @@ export default function Home() {
     ],
   }
 
-  const chartOptions = {
+  const chartOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
       x: {
-        type: 'category' as const,
+        type: 'category',
         title: {
           display: true,
           text: 'Time',
@@ -127,6 +128,9 @@ export default function Home() {
           <p>AI Response: {data.respuesta.choices[0].message.content}</p>
         </div>
       )}
+      <div className="w-full h-96">
+        {isClient && data && <Line data={chartData} options={chartOptions} />}
+      </div>
     </div>
   )
 }
