@@ -26,39 +26,13 @@ ChartJS.register(
 
 interface SensorData {
   _id: string;
-  messages: Array<{
-    role: string;
-    content: Array<{ type: string; text?: string; image_url?: { url: string } }>;
-  }>;
-  model: string;
-  respuesta: {
-    id: string;
-    object: string;
-    created: number;
-    model: string;
-    choices: Array<{
-      index: number;
-      message: { role: string; content: string };
-      logprobs: null;
-      finish_reason: string;
-    }>;
-    usage: {
-      queue_time: number;
-      prompt_tokens: number;
-      prompt_time: number;
-      completion_tokens: number;
-      completion_time: number;
-      total_tokens: number;
-      total_time: number;
-    };
-    system_fingerprint: string;
-    x_groq: { id: string };
-  };
-  fecha: number;
+  prompt: string;
+  result: string;
+  timestamp: number;
 }
 
 export default function Home() {
-  const [data, setData] = useState<SensorData | null>(null)
+  const [data, setData] = useState<SensorData[]>([])
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
@@ -69,7 +43,7 @@ export default function Home() {
         if (!response.ok) {
           throw new Error('Failed to fetch data')
         }
-        const result: SensorData = await response.json()
+        const result: SensorData[] = await response.json()
         setData(result)
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -83,11 +57,11 @@ export default function Home() {
   }, [])
 
   const chartData = {
-    labels: data ? [new Date(data.fecha).toLocaleString()] : [],
+    labels: data.map(item => new Date(item.timestamp).toLocaleString()),
     datasets: [
       {
-        label: 'Tokens Used',
-        data: data ? [data.respuesta.usage.total_tokens] : [],
+        label: 'Result Length',
+        data: data.map(item => item.result.length),
         borderColor: 'rgb(255, 99, 132)',
         backgroundColor: 'rgba(255, 99, 132, 0.5)',
       },
@@ -99,7 +73,7 @@ export default function Home() {
     maintainAspectRatio: false,
     scales: {
       x: {
-        type: 'category',
+        type: 'category' as const,
         title: {
           display: true,
           text: 'Time',
@@ -108,7 +82,7 @@ export default function Home() {
       y: {
         title: {
           display: true,
-          text: 'Tokens',
+          text: 'Result Length',
         },
       },
     },
@@ -119,17 +93,16 @@ export default function Home() {
       <h1 className="text-3xl font-bold mb-4">
         {isClient ? "Sensor Data" : "Datos del sensor"}
       </h1>
-      {data && (
+      {data.length > 0 && (
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Latest Data:</h2>
-          <p>Model: {data.model}</p>
-          <p>Created: {new Date(data.respuesta.created * 1000).toLocaleString()}</p>
-          <p>Total Tokens: {data.respuesta.usage.total_tokens}</p>
-          <p>AI Response: {data.respuesta.choices[0].message.content}</p>
+          <p>Timestamp: {new Date(data[0].timestamp).toLocaleString()}</p>
+          <p>Prompt: {data[0].prompt}</p>
+          <p>Result: {data[0].result}</p>
         </div>
       )}
       <div className="w-full h-96">
-        {isClient && data && <Line data={chartData} options={chartOptions} />}
+        {isClient && data.length > 0 && <Line data={chartData} options={chartOptions} />}
       </div>
     </div>
   )
