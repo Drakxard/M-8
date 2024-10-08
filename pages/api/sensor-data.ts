@@ -2,41 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import clientPromise from '../../lib/mongodb'
 import { ObjectId, MongoClient } from 'mongodb'
 
-interface Choice {
-  index: number;
-  message: { role: string; content: string };
-  logprobs: null;
-  finish_reason: string;
-}
-
-interface Usage {
-  queue_time: number;
-  prompt_tokens: number;
-  prompt_time: number;
-  completion_tokens: number;
-  completion_time: number;
-  total_tokens: number;
-  total_time: number;
-}
-
 interface SensorData {
   _id: ObjectId;
-  messages: Array<{
-    role: string;
-    content: Array<{ type: string; text?: string; image_url?: { url: string } }>;
-  }>;
-  model: string;
-  respuesta: {
-    id: string;
-    object: string;
-    created: number;
-    model: string;
-    choices: Choice[];
-    usage: Usage;
-    system_fingerprint: string;
-    x_groq: { id: string };
-  };
-  fecha: Date;
+  prompt: string;
+  result: string;
+  timestamp: Date;
 }
 
 export default async function handler(
@@ -48,29 +18,22 @@ export default async function handler(
       const client: MongoClient = await clientPromise
       const db = client.db("compost")
       
-      const data = await db.collection<SensorData>("datos").findOne({}, { sort: { fecha: -1 } })
+      const limit = parseInt(req.query.limit as string) || 5
+      const data = await db.collection<SensorData>("datos")
+        .find({})
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .toArray()
       
-      if (!data) {
+      if (!data.length) {
         return res.status(404).json({ error: 'No data found' })
       }
       
-      // Transform the data to remove $ from field names
-      const transformedData = {
-        ...data,
-        _id: data._id.toString(),
-        fecha: data.fecha.getTime(),
-        respuesta: {
-          ...data.respuesta,
-          choices: data.respuesta.choices.map((choice: Choice) => ({
-            ...choice,
-            index: choice.index
-          })),
-          usage: Object.entries(data.respuesta.usage).reduce((acc: Partial<Usage>, [key, value]) => {
-            acc[key as keyof Usage] = value
-            return acc
-          }, {})
-        }
-      }
+      const transformedData = data.map(item => ({
+        ...item,
+        _id: item._id.toString(),
+        timestamp: item.timestamp.getTime(),
+      }))
       
       return res.status(200).json(transformedData)
     } catch (e) {
