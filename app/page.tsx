@@ -44,7 +44,9 @@ export default function Home() {
           throw new Error('Failed to fetch data')
         }
         const result: SensorData[] = await response.json()
-        setData(result)
+        // Sort the data by timestamp in ascending order
+        const sortedData = result.sort((a, b) => a.timestamp - b.timestamp)
+        setData(sortedData)
       } catch (error) {
         console.error('Error fetching data:', error)
       }
@@ -96,9 +98,9 @@ export default function Home() {
       {data.length > 0 && (
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Latest Data:</h2>
-          <p>Timestamp: {new Date(data[0].timestamp).toLocaleString()}</p>
-          <p>Prompt: {data[0].prompt}</p>
-          <p>Result: {data[0].result}</p>
+          <p>Timestamp: {new Date(data[data.length - 1].timestamp).toLocaleString()}</p>
+          <p>Prompt: {data[data.length - 1].prompt}</p>
+          <p>Result: {data[data.length - 1].result}</p>
         </div>
       )}
       <div className="w-full h-96">
